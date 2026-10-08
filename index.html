@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SMART PADHAI - हिंदी परीक्षा पोर्टल</title>
+    <title>SMART PADHAI - हिंदी परीक्षा एवं परिणाम पोर्टल</title>
     <script src="https://jsdelivr.net"></script>
 </head>
 <body class="bg-gray-50 text-gray-800 font-sans min-h-screen">
@@ -11,7 +11,7 @@
     <!-- Header -->
     <header class="bg-blue-600 text-white p-4 shadow-md text-center">
         <h1 class="text-2xl font-bold">✨ SMART PADHAI ✨</h1>
-        <p class="text-sm opacity-90">AI संचालित हिंदी परीक्षा प्रणाली (Advanced Version)</p>
+        <p class="text-sm opacity-90">AI संचालित हिंदी परीक्षा प्रणाली (परिणाम संग्रह संस्करण)</p>
     </header>
 
     <main class="max-w-4xl mx-auto p-4 md:p-6">
@@ -24,6 +24,13 @@
                 <label class="block text-sm font-semibold mb-1">अपनी Gemini API Key डालें:</label>
                 <input type="password" id="apiKey" class="w-full p-2 border rounded-md" placeholder="AIzaSy...">
                 <button onclick="saveKey()" class="mt-2 bg-green-600 text-white px-4 py-1.5 rounded-md text-sm">चाबी सुरक्षित करें (Save Key)</button>
+            </div>
+
+            <!-- Webhook/Google Sheet Sync Option -->
+            <div class="mb-4 p-3 bg-yellow-50 rounded-md border border-yellow-200">
+                <label class="block text-sm font-semibold mb-1 text-yellow-800">📊 परिणाम संग्रह (Result Sync Webhook URL):</label>
+                <input type="url" id="webhookUrl" class="w-full p-2 border rounded-md text-sm bg-white" placeholder="https://google.com">
+                <p class="text-xs text-gray-500 mt-1">छात्रों का रिजल्ट सीधे गूगल शीट में भेजने के लिए अपना Google Apps Script URL यहाँ पेस्ट करें (वैकल्पिक)।</p>
             </div>
 
             <div class="mb-4">
@@ -79,6 +86,8 @@
             <p class="text-lg">छात्र का नाम: <span id="resName" class="font-bold"></span> | कक्षा: <span id="resClass" class="font-bold"></span></p>
             <div class="text-3xl font-black text-blue-600 my-4">आपका स्कोर: <span id="scoreObtained">0</span> / <span id="scoreTotal">0</span></div>
             
+            <p id="syncStatus" class="text-sm font-semibold text-gray-600 italic my-2"></p>
+
             <div class="mt-6">
                 <h3 class="text-lg font-bold text-gray-800 mb-3">📖 उत्तर कुंजी (Answer Key)</h3>
                 <div id="answerKeyArea" class="space-y-3 text-sm">
@@ -93,14 +102,18 @@
 
     <script>
         document.getElementById('apiKey').value = localStorage.getItem('gemini_key') || '';
+        document.getElementById('webhookUrl').value = localStorage.getItem('exam_webhook') || '';
+        
         let generatedQuestionsList = [];
         let timeRemaining = 0;
         let timerInterval = null;
 
         function saveKey() {
             const key = document.getElementById('apiKey').value;
+            const webhook = document.getElementById('webhookUrl').value;
             localStorage.setItem('gemini_key', key);
-            alert('आपकी API Key सुरक्षित रूप से सेव कर दी गई है!');
+            localStorage.setItem('exam_webhook', webhook);
+            alert('आपकी सेटिंग्स सुरक्षित रूप से सेव कर दी गई हैं!');
         }
 
         async function generateQuestions() {
@@ -122,7 +135,7 @@
                 });
 
                 const data = await response.json();
-                let rawText = data.candidates[0].content.parts[0].text;
+                let rawText = data.candidates.content.parts.text;
                 
                 rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
                 generatedQuestionsList = JSON.parse(rawText);
@@ -157,25 +170,3 @@
                         </label>`;
                     });
                 } else {
-                    html += `<textarea name="q_${idx}" class="w-full p-2 border rounded bg-white h-20" placeholder="अपना उत्तर यहाँ लिखें..."></textarea>`;
-                }
-                html += `</div>`;
-                area.innerHTML += html;
-            });
-        }
-
-        function startExam() {
-            const name = document.getElementById('studentName').value;
-            const cls = document.getElementById('studentClass').value;
-            if(!name || !cls) return alert('कृपया नाम और कक्षा भरें!');
-            
-            document.getElementById('studentForm').classList.add('hidden');
-            document.getElementById('questionsArea').classList.remove('hidden');
-            document.getElementById('submitExamBtn').classList.remove('hidden');
-            document.getElementById('teacherPanel').classList.add('hidden');
-
-            // Start Timer
-            timerInterval = setInterval(() => {
-                timeRemaining--;
-                updateTimerDisplay();
-                if(timeRemaining <= 0) {
