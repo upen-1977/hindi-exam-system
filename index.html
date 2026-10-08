@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMART PADHAI - हिंदी परीक्षा पोर्टल</title>
+    <script src="https://jsdelivr.net"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen">
+
+    <!-- Header -->
+    <header class="bg-blue-600 text-white p-4 shadow-md text-center">
+        <h1 class="text-2xl font-bold">✨ SMART PADHAI ✨</h1>
+        <p class="text-sm opacity-90">AI संचालित हिंदी परीक्षा प्रणाली</p>
+    </header>
+
+    <main class="max-w-4xl mx-auto p-4 md:p-6">
+        
+        <!-- Teacher Portal (API & Generation) -->
+        <section class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-6">
+            <h2 class="text-lg font-bold text-blue-600 mb-3">🛠️ शिक्षक पैनल (Teacher Dashboard)</h2>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-semibold mb-1">अपनी Gemini API Key डालें (यह आपके ब्राउज़र में सुरक्षित रहेगी):</label>
+                <input type="password" id="apiKey" class="w-full p-2 border rounded-md" placeholder="AIzaSy...">
+                <button onclick="saveKey()" class="mt-2 bg-green-600 text-white px-4 py-1.5 rounded-md hover:bg-green-700 text-sm">चाबी सुरक्षित करें (Save Key)</button>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-semibold mb-1">AI से क्या बनवाना चाहते हैं? (Prompt):</label>
+                <textarea id="aiPrompt" class="w-full p-2 border rounded-md h-20" placeholder="उदा. कक्षा 10 हिंदी संचयन के पाठ 'सपनों के-से दिन' से 3 MCQ प्रश्न बनाओ।"></textarea>
+                <button onclick="generateQuestions()" class="mt-2 bg-blue-600 text-white px-5 py-2 rounded-md hover:bg-blue-700 font-semibold w-full">AI प्रश्न पत्र तैयार करें 🚀</button>
+            </div>
+        </section>
+
+        <!-- Student Exam Portal -->
+        <section id="examSection" class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 hidden">
+            <div class="border-b pb-3 mb-4">
+                <h2 class="text-xl font-bold text-center text-gray-800" id="paperTitle">हिंदी अभ्यास परीक्षा पत्र</h2>
+                <div class="flex justify-between text-sm text-gray-500 mt-2">
+                    <span>समय शेष: <strong id="timer">20:00</strong></span>
+                    <span>कुल प्रश्न: <strong id="totalQ">0</strong></span>
+                </div>
+            </div>
+
+            <!-- Student Info Form -->
+            <div id="studentForm" class="mb-6 bg-blue-50 p-4 rounded-md">
+                <h3 class="font-semibold mb-2">छात्र का विवरण भरें:</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <input type="text" id="studentName" placeholder="छात्र का नाम" class="p-2 border rounded bg-white" required>
+                    <input type="text" id="studentClass" placeholder="कक्षा" class="p-2 border rounded bg-white" required>
+                </div>
+                <button onclick="startExam()" class="mt-3 bg-blue-600 text-white px-6 py-2 rounded font-semibold w-full">परीक्षा प्रारंभ करें 🟢</button>
+            </div>
+
+            <!-- Questions Container -->
+            <div id="questionsArea" class="space-y-6 hidden">
+                <!-- Questions will appear here dynamically -->
+            </div>
+
+            <button id="submitExamBtn" onclick="submitExam()" class="mt-6 bg-red-600 text-white px-6 py-3 rounded-lg font-bold w-full hidden hover:bg-red-700">परीक्षा जमा करें (Submit Exam)</button>
+        </section>
+
+        <!-- Result Dashboard -->
+        <section id="resultSection" class="bg-green-50 p-6 rounded-lg border border-green-200 shadow-sm hidden mt-6">
+            <h2 class="text-2xl font-bold text-green-700 mb-2">🎉 परीक्षा परिणाम (Result)</h2>
+            <p class="text-lg">छात्र का नाम: <span id="resName" class="font-bold"></span></p>
+            <p class="text-lg">कक्षा: <span id="resClass" class="font-bold"></span></p>
+            <div class="text-3xl font-black text-blue-600 my-4">आपका स्कोर: <span id="scoreObtained">0</span> / <span id="scoreTotal">0</span></div>
+            <button onclick="window.location.reload()" class="bg-gray-600 text-white px-4 py-2 rounded">🔄 नया प्रयास शुरू करें</button>
+        </section>
+
+    </main>
+
+    <footer class="text-center py-6 text-xs text-gray-400 mt-12 border-t">
+        © Copyright 2026 | SMART PADHAI
+    </footer>
+
+    <script>
+        // Load saved key on startup
+        document.getElementById('apiKey').value = localStorage.getItem('gemini_key') || '';
+        let generatedQuestionsList = [];
+
+        function saveKey() {
+            const key = document.getElementById('apiKey').value;
+            localStorage.setItem('gemini_key', key);
+            alert('आपकी API Key ब्राउज़र में सुरक्षित रूप से सेव कर दी गई है!');
+        }
+
+        async function generateQuestions() {
+            const key = localStorage.getItem('gemini_key');
+            const promptText = document.getElementById('aiPrompt').value;
+            
+            if(!key) return alert('कृपया पहले अपनी API Key डालकर सेव करें!');
+            if(!promptText) return alert('कृपया AI के लिए निर्देश लिखें!');
+
+            alert('AI आपका प्रश्न पत्र तैयार कर रहा है, कृपया कुछ सेकंड प्रतीक्षा करें...');
+
+            // Formatted instructions for JSON output
+            const finalPrompt = `${promptText} \n\nIMPORTANT: Return the response ONLY as a valid JSON array of objects. Do not include markdown code block formatting. Follow this schema precisely: [{"id": 1, "question": "प्रश्न यहाँ लिखे", "options": ["विकल्प A", "विकल्प B", "विकल्प C", "विकल्प D"], "correct": 0}]. For text/long questions, omit the options field and put correct as "".`;
+
+            try {
+                const response = await fetch(`https://googleapis.com{key}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: finalPrompt }] }] })
+                });
+
+                const data = await response.json();
+                let rawText = data.candidates[0].content.parts[0].text;
+                
+                // Clean markdown code blocks if any
+                rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+                
+                generatedQuestionsList = JSON.parse(rawText);
+                setupExamPortal();
+            } catch (error) {
+                console.error(error);
+                alert('प्रश्न बनाने में त्रुटि हुई। कृपया अपना प्रॉम्प्ट या API Key जांचें।');
+            }
+        }
+
+        function setupExamPortal() {
+            document.getElementById('examSection').classList.remove('hidden');
+            document.getElementById('totalQ').innerText = generatedQuestionsList.length;
+            
+            const area = document.getElementById('questionsArea');
+            area.innerHTML = '';
+            
+            generatedQuestionsList.forEach((q, idx) => {
+                let html = `<div class="p-4 border border-gray-100 rounded-md bg-gray-50">
+                    <p class="font-semibold mb-2">प्रश्न ${idx + 1}: ${q.question}</p>`;
+                
+                if(q.options && q.options.length > 0) {
+                    q.options.forEach((opt, oIdx) => {
+                        html += `<label class="block p-2 bg-white rounded border my-1 cursor-pointer hover:bg-gray-50 flex items-center gap-2">
+                            <input type="radio" name="q_${idx}" value="${oIdx}"> ${opt}
+                        </label>`;
+                    });
+                } else {
+                    html += `<textarea name="q_${idx}" class="w-full p-2 border rounded bg-white h-16 placeholder="अपना उत्तर यहाँ लिखें..."></textarea>`;
+                }
+                html += `</div>`;
+                area.innerHTML += html;
+            });
+        }
+
+        function startExam() {
+            const name = document.getElementById('studentName').value;
+            const cls = document.getElementById('studentClass').value;
+            if(!name || !cls) return alert('कृपया नाम और कक्षा भरें!');
+            
+            document.getElementById('studentForm').classList.add('hidden');
+            document.getElementById('questionsArea').classList.remove('hidden');
+            document.getElementById('submitExamBtn').classList.remove('hidden');
+        }
+
+        function submitExam() {
+            let score = 0;
+            generatedQuestionsList.forEach((q, idx) => {
+                if(q.options && q.options.length > 0) {
+                    const selected = document.querySelector(`input[name="q_${idx}"]:checked`);
+                    if(selected && parseInt(selected.value) === q.correct) {
+                        score++;
+                    }
+                } else {
+                    // For long text, standard auto-marking grants points if filled (can be expanded later)
+                    const val = document.querySelector(`textarea[name="q_${idx}"]`).value;
+                    if(val.trim().length > 5) score++;
+                }
+            });
+
+            document.getElementById('examSection').classList.add('hidden');
+            document.getElementById('resultSection').classList.remove('hidden');
+            
+            document.getElementById('resName').innerText = document.getElementById('studentName').value;
+            document.getElementById('resClass').innerText = document.getElementById('studentClass').value;
+            document.getElementById('scoreObtained').innerText = score;
+            document.getElementById('scoreTotal').innerText = generatedQuestionsList.length;
+        }
+    </script>
+</body>
+</html>
